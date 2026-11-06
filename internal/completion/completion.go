@@ -60,7 +60,7 @@ func bash(prog string, flags []Flag) string {
 		}
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "# bash completion for %s. Load it with:  source <(%s -completion bash)\n\n", prog, prog)
+	fmt.Fprintf(&b, "# bash completion for %s. Load it with:  source <(%s -complete bash)\n\n", prog, prog)
 	fmt.Fprintf(&b, `# _%[1]s_values WORDS completes the current word from WORDS. If the word is
 # `+"`--flag=val`"+` (when '=' is not a word break), the flag part is kept.
 _%[1]s_values() {
@@ -121,7 +121,7 @@ func zshEscape(s string) string {
 
 func zsh(prog string, flags []Flag) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "#compdef %s\n# zsh completion for %s. Put it in a directory of $fpath as _%s,\n# or load it with:  source <(%s -completion zsh)\n\n", prog, prog, prog, prog)
+	fmt.Fprintf(&b, "#compdef %s\n# zsh completion for %s. Put it in a directory of $fpath as _%s,\n# or load it with:  source <(%s -complete zsh)\n\n", prog, prog, prog, prog)
 	fmt.Fprintf(&b, "_%s() {\n  _arguments -s \\\n", prog)
 	for _, f := range flags {
 		opt := spelling(f.Name)
@@ -149,7 +149,7 @@ func fishEscape(s string) string {
 
 func fish(prog string, flags []Flag) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "# fish completion for %s. Put it in ~/.config/fish/completions/%s.fish,\n# or load it with:  %s -completion fish | source\n\n", prog, prog, prog)
+	fmt.Fprintf(&b, "# fish completion for %s. Put it in ~/.config/fish/completions/%s.fish,\n# or load it with:  %s -complete fish | source\n\n", prog, prog, prog)
 	fmt.Fprintf(&b, "complete -c %s -f -a '(__fish_complete_suffix .scad)'\n", prog)
 	for _, f := range flags {
 		sel := "-l " + f.Name

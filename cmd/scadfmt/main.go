@@ -51,7 +51,7 @@ func main() {
 type flags struct {
 	write, check, noConfig bool
 	showVersion            bool
-	completion             string
+	complete               optionalValue
 	configPath, preset     string
 	stdinPath              string
 
@@ -70,7 +70,7 @@ func newFlagSet(fl *flags, stderr io.Writer) *flag.FlagSet {
 	fs.BoolVar(&fl.write, "w", false, "write result to the source file instead of stdout")
 	fs.BoolVar(&fl.check, "check", false, "list files whose formatting differs; exit 1 if any")
 	fs.BoolVar(&fl.showVersion, "version", false, "print the version and exit")
-	fs.StringVar(&fl.completion, "completion", "", "print a shell completion script ("+strings.Join(completion.Shells(), ", ")+") and exit")
+	fs.Var(&fl.complete, "complete", "print the shell completion script and exit; the shell ("+strings.Join(completion.Shells(), ", ")+") is taken from $SHELL unless given: -complete zsh")
 	fs.StringVar(&fl.configPath, "config", "", "use this config file instead of searching for "+config.FileName)
 	fs.BoolVar(&fl.noConfig, "no-config", false, "ignore config files")
 	fs.StringVar(&fl.preset, "preset", "", "start from a preset: default or pretty")
@@ -109,7 +109,46 @@ var flagChoices = map[string][]string{
 	"chain-indent": {format.ChainIndentStep, format.ChainIndentSame},
 	"matrix":       {format.MatrixPreserve, format.MatrixReflow, format.MatrixAlign},
 	"preset":       config.PresetNames,
-	"completion":   completion.Shells(),
+	"complete":     completion.Shells(),
+}
+
+// optionalValue is a flag whose value may be left out: `-complete` alone, or
+// `-complete=zsh`. It reports itself as a boolean flag so that the flag package
+// does not take the next argument as its value; run looks at that argument.
+type optionalValue struct {
+	set bool
+	val string
+}
+
+func (o *optionalValue) String() string   { return o.val }
+func (o *optionalValue) IsBoolFlag() bool { return true }
+func (o *optionalValue) Set(s string) error {
+	o.set = true
+	if s != "true" { // the flag package passes "true" for a bare flag
+		o.val = s
+	}
+	return nil
+}
+
+// detectShell names the shell in a $SHELL value such as /usr/bin/zsh.
+func detectShell(shellEnv string) (string, error) {
+	name := shellEnv[strings.LastIndexAny(shellEnv, `/\`)+1:] // either kind of separator
+	name = strings.TrimSuffix(name, ".exe")
+	for _, s := range completion.Shells() {
+		if name == s {
+			return s, nil
+		}
+	}
+	return "", fmt.Errorf("cannot tell which shell you use (SHELL=%q); say which: -complete bash, zsh or fish", shellEnv)
+}
+
+func isShell(name string) bool {
+	for _, s := range completion.Shells() {
+		if name == s {
+			return true
+		}
+	}
+	return false
 }
 
 // fileFlags take a file name.
@@ -123,9 +162,12 @@ func completionFlags() []completion.Flag {
 		if b, ok := f.Value.(interface{ IsBoolFlag() bool }); ok {
 			isBool = b.IsBoolFlag()
 		}
+		// A flag with choices, like -complete, takes an optional value but is
+		// still worth completing the value of.
+		choices := flagChoices[f.Name]
 		out = append(out, completion.Flag{
-			Name: f.Name, Usage: f.Usage, Bool: isBool,
-			Values: flagChoices[f.Name], File: fileFlags[f.Name],
+			Name: f.Name, Usage: f.Usage, Bool: isBool && len(choices) == 0,
+			Values: choices, File: fileFlags[f.Name],
 		})
 	})
 	return out
@@ -212,8 +254,19 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		return 2
 	}
-	if fl.completion != "" {
-		script, err := completion.Generate(fl.completion, "scadfmt", completionFlags())
+	if fl.complete.set {
+		shell := fl.complete.val
+		if shell == "" && len(paths) > 0 && isShell(paths[0]) {
+			shell = paths[0] // -complete zsh
+		}
+		if shell == "" {
+			shell, err = detectShell(os.Getenv("SHELL"))
+			if err != nil {
+				fmt.Fprintln(stderr, "scadfmt:", err)
+				return 2
+			}
+		}
+		script, err := completion.Generate(shell, "scadfmt", completionFlags())
 		if err != nil {
 			fmt.Fprintln(stderr, "scadfmt:", err)
 			return 2

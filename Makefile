@@ -52,9 +52,9 @@ corpus: ## Fetch the pinned OpenSCAD source into ./openscad if missing
 
 dist: ## Cross-compile release archives and SHA256SUMS into ./dist
 	rm -rf dist && mkdir -p dist/completions
-	go run ./cmd/scadfmt --completion=bash > dist/completions/scadfmt.bash
-	go run ./cmd/scadfmt --completion=zsh  > dist/completions/_scadfmt
-	go run ./cmd/scadfmt --completion=fish > dist/completions/scadfmt.fish
+	go run ./cmd/scadfmt -complete=bash > dist/completions/scadfmt.bash
+	go run ./cmd/scadfmt -complete=zsh  > dist/completions/_scadfmt
+	go run ./cmd/scadfmt -complete=fish > dist/completions/scadfmt.fish
 	@set -e; for p in $(PLATFORMS); do \
 		os=$${p%/*}; arch=$${p#*/}; ext=""; [ "$$os" = windows ] && ext=.exe; \
 		name=$(BINARY)_$(VERSION)_$${os}_$${arch}; \

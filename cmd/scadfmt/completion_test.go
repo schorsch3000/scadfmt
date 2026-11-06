@@ -26,7 +26,7 @@ func TestCompletionCoversAllFlags(t *testing.T) {
 		}
 	}
 	for _, shell := range []string{"bash", "zsh", "fish"} {
-		code, out, errs := runCLI(t, "", "-completion", shell)
+		code, out, errs := runCLI(t, "", "-complete="+shell)
 		if code != 0 {
 			t.Fatalf("%s: code %d: %s", shell, code, errs)
 		}
@@ -42,9 +42,9 @@ func TestCompletionCoversAllFlags(t *testing.T) {
 		}
 		for _, v := range values {
 			// Each offered value must be one the CLI really accepts.
-			if name == "completion" {
-				if code, _, _ := runCLI(t, "", "-completion", v); code != 0 {
-					t.Errorf("-completion %s rejected", v)
+			if name == "complete" {
+				if code, _, _ := runCLI(t, "", "-complete="+v); code != 0 {
+					t.Errorf("-complete=%s rejected", v)
 				}
 				continue
 			}
@@ -56,9 +56,60 @@ func TestCompletionCoversAllFlags(t *testing.T) {
 }
 
 func TestCompletionUnknownShell(t *testing.T) {
-	code, _, errs := runCLI(t, "", "-completion", "tcsh")
+	code, _, errs := runCLI(t, "", "-complete=tcsh")
 	if code != 2 || !strings.Contains(errs, "tcsh") {
 		t.Errorf("code=%d err=%q", code, errs)
+	}
+}
+
+// -complete takes the shell from the flag, from the next argument, or from
+// $SHELL, in that order.
+func TestCompleteChoosesShell(t *testing.T) {
+	marker := map[string]string{"bash": "bash completion for", "zsh": "#compdef", "fish": "fish completion for"}
+	cases := []struct {
+		name, shellEnv string
+		args           []string
+		want           string // shell whose script must come out
+	}{
+		{"flag value", "/bin/bash", []string{"-complete=zsh"}, "zsh"},
+		{"double dash", "/bin/bash", []string{"--complete=fish"}, "fish"},
+		{"next argument", "/bin/bash", []string{"-complete", "zsh"}, "zsh"},
+		{"from SHELL", "/usr/bin/fish", []string{"-complete"}, "fish"},
+		{"from SHELL, bash", "/bin/bash", []string{"-complete"}, "bash"},
+		{"explicit beats SHELL", "/usr/bin/zsh", []string{"-complete", "bash"}, "bash"},
+		{"exe suffix", `C:\tools\bash.exe`, []string{"-complete"}, "bash"},
+	}
+	for _, c := range cases {
+		t.Setenv("SHELL", c.shellEnv)
+		code, out, errs := runCLI(t, "", c.args...)
+		if code != 0 {
+			t.Errorf("%s: code %d: %s", c.name, code, errs)
+			continue
+		}
+		for shell, m := range marker {
+			if has := strings.Contains(out, m); has != (shell == c.want) {
+				t.Errorf("%s: wanted the %s script, but %s marker present=%v", c.name, c.want, shell, has)
+			}
+		}
+	}
+}
+
+func TestCompleteNeedsAShell(t *testing.T) {
+	for _, shellEnv := range []string{"", "/bin/tcsh", "/usr/bin/nologin"} {
+		t.Setenv("SHELL", shellEnv)
+		code, out, errs := runCLI(t, "", "-complete")
+		if code != 2 || out != "" || !strings.Contains(errs, "-complete bash, zsh or fish") {
+			t.Errorf("SHELL=%q: code=%d out=%q err=%q", shellEnv, code, out, errs)
+		}
+	}
+}
+
+// -complete must not swallow file arguments that are not shell names.
+func TestCompleteIgnoresOtherArguments(t *testing.T) {
+	t.Setenv("SHELL", "/bin/bash")
+	code, out, _ := runCLI(t, "", "-complete", "file.scad")
+	if code != 0 || !strings.Contains(out, "bash completion for") {
+		t.Errorf("code=%d", code)
 	}
 }
 
@@ -69,7 +120,7 @@ func TestBashCompletion(t *testing.T) {
 	if err != nil {
 		t.Skip("no bash")
 	}
-	_, script, _ := runCLI(t, "", "-completion", "bash")
+	_, script, _ := runCLI(t, "", "-complete=bash")
 	dir := t.TempDir()
 	scriptPath := filepath.Join(dir, "completion.bash")
 	if err := os.WriteFile(scriptPath, []byte(script), 0o644); err != nil {
@@ -123,7 +174,8 @@ func TestBashCompletion(t *testing.T) {
 	// ...but not everywhere: then it is one word and the flag part is kept.
 	check("equals one word", complete(1, "scadfmt", "--matrix=pr"), "--matrix=preserve")
 	check("preset", complete(2, "scadfmt", "--preset", ""), "default", "pretty")
-	check("shell", complete(2, "scadfmt", "--completion", ""), "bash", "zsh", "fish")
+	check("shell", complete(2, "scadfmt", "--complete", ""), "bash", "zsh", "fish")
+	check("shell after =", complete(3, "scadfmt", "-complete", "=", "f"), "fish")
 	check("free-form value", complete(2, "scadfmt", "--indent", ""))
 	check("scad files and dirs", complete(1, "scadfmt", ""), "a.scad", "sub")
 	check("into a directory", complete(1, "scadfmt", "sub/"), "sub/c.scad")
