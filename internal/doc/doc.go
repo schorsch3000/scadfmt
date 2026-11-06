@@ -38,6 +38,16 @@ type (
 
 	// BreakParent is empty but forces every enclosing group to break.
 	BreakParent struct{}
+
+	// LiteralLine is a forced line break that does not indent the next line.
+	// It is for text that must keep its own layout, such as multi-line
+	// comments and strings.
+	LiteralLine struct{}
+
+	// Detach prints D in broken mode and hides any forced break inside D from
+	// the enclosing groups. It lets a trailing `{ ... }` block hang off a group
+	// without forcing that group to break.
+	Detach struct{ D Doc }
 )
 
 func (Text) isDoc()        {}
@@ -48,6 +58,8 @@ func (*Group) isDoc()      {}
 func (IfBreak) isDoc()     {}
 func (LineSuffix) isDoc()  {}
 func (BreakParent) isDoc() {}
+func (LiteralLine) isDoc() {}
+func (Detach) isDoc()      {}
 
 // Common constructors and singletons.
 var (

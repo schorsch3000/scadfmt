@@ -75,6 +75,19 @@ func Print(d Doc, opts Options) string {
 		case LineSuffix:
 			suffix = append(suffix, cmd{c.indent, c.mode, x.D})
 		case BreakParent:
+		case Detach:
+			stack = append(stack, cmd{c.indent, modeBreak, x.D})
+		case LiteralLine:
+			if len(suffix) > 0 {
+				stack = append(stack, c)
+				for i := len(suffix) - 1; i >= 0; i-- {
+					stack = append(stack, suffix[i])
+				}
+				suffix = nil
+				continue
+			}
+			out = append(out, '\n')
+			col = 0
 		case Line:
 			if c.mode == modeFlat && !x.Hard {
 				if !x.Soft {
@@ -141,6 +154,10 @@ func fits(next cmd, rest []cmd, width int, opts Options) bool {
 			} else {
 				stack = append(stack, cmd{c.indent, c.mode, x.Flat})
 			}
+		case Detach:
+			stack = append(stack, cmd{c.indent, modeBreak, x.D})
+		case LiteralLine:
+			return true
 		case Line:
 			if c.mode == modeBreak || x.Hard {
 				return true
@@ -174,13 +191,17 @@ func propagateBreaks(d Doc) bool {
 		}
 		return x.Break
 	case IfBreak:
-		b := propagateBreaks(x.Broken)
-		f := propagateBreaks(x.Flat)
-		return b || f
+		// A forced break in the Broken branch only matters once the group is
+		// already broken, so it must not break the group by itself.
+		propagateBreaks(x.Broken)
+		return propagateBreaks(x.Flat)
 	case Line:
 		return x.Hard
-	case BreakParent:
+	case BreakParent, LiteralLine:
 		return true
+	case Detach:
+		propagateBreaks(x.D)
+		return false
 	}
 	return false
 }
