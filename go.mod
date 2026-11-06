@@ -1,5 +1,5 @@
-module scadfmt
+module github.com/schorsch3000/scadfmt
 
-go 1.27.2
+go 1.22
 
 require gopkg.in/yaml.v3 v3.0.1

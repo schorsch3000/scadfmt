@@ -3,8 +3,8 @@ package format
 import (
 	"testing"
 
-	"scadfmt/internal/lexer"
-	"scadfmt/internal/syntax"
+	"github.com/schorsch3000/scadfmt/internal/lexer"
+	"github.com/schorsch3000/scadfmt/internal/syntax"
 )
 
 func fmtWith(t *testing.T, src string, mut func(*Options)) string {

@@ -3,9 +3,9 @@ package format
 import (
 	"strings"
 
-	"scadfmt/internal/doc"
-	"scadfmt/internal/lexer"
-	"scadfmt/internal/syntax"
+	"github.com/schorsch3000/scadfmt/internal/doc"
+	"github.com/schorsch3000/scadfmt/internal/lexer"
+	"github.com/schorsch3000/scadfmt/internal/syntax"
 )
 
 // file prints a whole file; the result ends with a line break unless empty.

@@ -4,9 +4,9 @@ package format
 import (
 	"fmt"
 
-	"scadfmt/internal/doc"
-	"scadfmt/internal/lexer"
-	"scadfmt/internal/syntax"
+	"github.com/schorsch3000/scadfmt/internal/doc"
+	"github.com/schorsch3000/scadfmt/internal/lexer"
+	"github.com/schorsch3000/scadfmt/internal/syntax"
 )
 
 // Chain layouts for transform chains such as `translate(a) rotate(b) cube(c);`.

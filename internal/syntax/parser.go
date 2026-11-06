@@ -3,7 +3,7 @@ package syntax
 import (
 	"fmt"
 
-	"scadfmt/internal/lexer"
+	"github.com/schorsch3000/scadfmt/internal/lexer"
 )
 
 // K is shorthand for token kinds used throughout the parser.

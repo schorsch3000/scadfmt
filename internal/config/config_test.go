@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"scadfmt/internal/format"
+	"github.com/schorsch3000/scadfmt/internal/format"
 )
 
 func TestParseFull(t *testing.T) {

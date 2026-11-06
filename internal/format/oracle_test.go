@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"scadfmt/internal/lexer"
-	"scadfmt/internal/syntax"
+	"github.com/schorsch3000/scadfmt/internal/lexer"
+	"github.com/schorsch3000/scadfmt/internal/syntax"
 )
 
 // astDump runs `openscad --export-format ast` on a file and returns its output.

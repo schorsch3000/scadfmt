@@ -4,7 +4,7 @@
 // are never lost. The grammar follows openscad/src/core/parser.y.
 package syntax
 
-import "scadfmt/internal/lexer"
+import "github.com/schorsch3000/scadfmt/internal/lexer"
 
 // Tok is a token in the tree. Pointers refer into the slice returned by
 // lexer.Lex and are stable.

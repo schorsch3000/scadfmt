@@ -140,3 +140,10 @@ func TestErrors(t *testing.T) {
 		t.Errorf("missing file: code %d", code)
 	}
 }
+
+func TestVersion(t *testing.T) {
+	code, out, _ := runCLI(t, "", "-version")
+	if code != 0 || !strings.HasPrefix(out, "scadfmt ") {
+		t.Errorf("code=%d out=%q", code, out)
+	}
+}

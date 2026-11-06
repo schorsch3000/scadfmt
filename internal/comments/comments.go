@@ -12,7 +12,7 @@
 // lines and tell own-line comments from inline ones.
 package comments
 
-import "scadfmt/internal/lexer"
+import "github.com/schorsch3000/scadfmt/internal/lexer"
 
 // Comment is one `//` or `/* */` comment.
 type Comment struct {

@@ -3,9 +3,9 @@ package format
 import (
 	"strings"
 
-	"scadfmt/internal/doc"
-	"scadfmt/internal/lexer"
-	"scadfmt/internal/syntax"
+	"github.com/schorsch3000/scadfmt/internal/doc"
+	"github.com/schorsch3000/scadfmt/internal/lexer"
+	"github.com/schorsch3000/scadfmt/internal/syntax"
 )
 
 // delimited prints `open item, item, ... close` as a group: on one line if it

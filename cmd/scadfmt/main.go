@@ -9,10 +9,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 
-	"scadfmt/internal/config"
-	"scadfmt/internal/format"
+	"github.com/schorsch3000/scadfmt/internal/config"
+	"github.com/schorsch3000/scadfmt/internal/format"
 )
 
 const usage = `usage: scadfmt [flags] [file or directory ...]
@@ -25,6 +26,21 @@ and can be overridden with the flags below.
 
 `
 
+// version is set at build time: -ldflags "-X main.version=v1.2.3".
+var version = "dev"
+
+// versionString returns the stamped version, or for a binary built by
+// `go install module@version` the module version Go recorded.
+func versionString() string {
+	if version != "dev" {
+		return version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	return version
+}
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
@@ -33,6 +49,7 @@ func main() {
 // they were given, which is tracked in set.
 type flags struct {
 	write, check, noConfig bool
+	showVersion            bool
 	configPath, preset     string
 	stdinPath              string
 
@@ -50,6 +67,7 @@ func parseFlags(args []string, stderr io.Writer) (*flags, []string, error) {
 	}
 	fs.BoolVar(&fl.write, "w", false, "write result to the source file instead of stdout")
 	fs.BoolVar(&fl.check, "check", false, "list files whose formatting differs; exit 1 if any")
+	fs.BoolVar(&fl.showVersion, "version", false, "print the version and exit")
 	fs.StringVar(&fl.configPath, "config", "", "use this config file instead of searching for "+config.FileName)
 	fs.BoolVar(&fl.noConfig, "no-config", false, "ignore config files")
 	fs.StringVar(&fl.preset, "preset", "", "start from a preset: default or pretty")
@@ -156,6 +174,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 0
 		}
 		return 2
+	}
+	if fl.showVersion {
+		fmt.Fprintln(stdout, "scadfmt", versionString())
+		return 0
 	}
 	cache := map[string]format.Options{}
 

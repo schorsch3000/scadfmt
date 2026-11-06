@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"scadfmt/internal/lexer"
-	"scadfmt/internal/syntax"
+	"github.com/schorsch3000/scadfmt/internal/lexer"
+	"github.com/schorsch3000/scadfmt/internal/syntax"
 )
 
 // signature returns the token texts of src without trailing commas (which the

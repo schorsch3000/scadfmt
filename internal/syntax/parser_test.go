@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"scadfmt/internal/lexer"
+	"github.com/schorsch3000/scadfmt/internal/lexer"
 )
 
 func parse(t *testing.T, src string) (*File, []lexer.Token, error) {

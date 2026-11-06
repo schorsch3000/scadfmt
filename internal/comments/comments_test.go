@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"scadfmt/internal/lexer"
+	"github.com/schorsch3000/scadfmt/internal/lexer"
 )
 
 func attach(t *testing.T, src string) ([]lexer.Token, Map) {

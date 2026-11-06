@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"scadfmt/internal/lexer"
-	"scadfmt/internal/syntax"
+	"github.com/schorsch3000/scadfmt/internal/lexer"
+	"github.com/schorsch3000/scadfmt/internal/syntax"
 )
 
 // verify checks that out is the same program as the input and that no comment

@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strings"
 
-	"scadfmt/internal/lexer"
+	"github.com/schorsch3000/scadfmt/internal/lexer"
 )
 
 // EqualOptions tunes Equal.

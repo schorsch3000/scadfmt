@@ -3,10 +3,10 @@ package format
 import (
 	"strings"
 
-	"scadfmt/internal/comments"
-	"scadfmt/internal/doc"
-	"scadfmt/internal/lexer"
-	"scadfmt/internal/syntax"
+	"github.com/schorsch3000/scadfmt/internal/comments"
+	"github.com/schorsch3000/scadfmt/internal/doc"
+	"github.com/schorsch3000/scadfmt/internal/lexer"
+	"github.com/schorsch3000/scadfmt/internal/syntax"
 )
 
 type printer struct {

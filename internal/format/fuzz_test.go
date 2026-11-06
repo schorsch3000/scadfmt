@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"scadfmt/internal/lexer"
-	"scadfmt/internal/syntax"
+	"github.com/schorsch3000/scadfmt/internal/lexer"
+	"github.com/schorsch3000/scadfmt/internal/syntax"
 )
 
 // fuzzOptions returns one of several option sets, chosen by n.

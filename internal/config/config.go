@@ -14,7 +14,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"scadfmt/internal/format"
+	"github.com/schorsch3000/scadfmt/internal/format"
 )
 
 // FileName is the config file looked for in each directory up the tree.

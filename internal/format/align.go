@@ -5,8 +5,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"scadfmt/internal/doc"
-	"scadfmt/internal/syntax"
+	"github.com/schorsch3000/scadfmt/internal/doc"
+	"github.com/schorsch3000/scadfmt/internal/syntax"
 )
 
 // ---- measuring ----
