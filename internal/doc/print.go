@@ -77,6 +77,8 @@ func Print(d Doc, opts Options) string {
 		case BreakParent:
 		case Detach:
 			stack = append(stack, cmd{c.indent, modeBreak, x.D})
+		case Fill:
+			stack = fillStep(x, c, stack, opts.MaxWidth-col, opts)
 		case LiteralLine:
 			if len(suffix) > 0 {
 				stack = append(stack, c)
@@ -115,6 +117,41 @@ func Print(d Doc, opts Options) string {
 		}
 	}
 	return strings.TrimRight(string(out), " \t")
+}
+
+// fillStep schedules the first content item of a Fill and the separator after
+// it, then the rest of the fill. A separator is printed flat when the content
+// on both sides of it fits on the current line, and broken otherwise.
+func fillStep(x Fill, c cmd, stack []cmd, width int, opts Options) []cmd {
+	parts := x.Parts
+	if len(parts) == 0 {
+		return stack
+	}
+	content := parts[0]
+	flat := func(d Doc) cmd { return cmd{c.indent, modeFlat, d} }
+	brk := func(d Doc) cmd { return cmd{c.indent, modeBreak, d} }
+	contentFits := fits(flat(content), nil, width, opts)
+	if len(parts) == 1 {
+		if contentFits {
+			return append(stack, flat(content))
+		}
+		return append(stack, brk(content))
+	}
+	sep := parts[1]
+	if len(parts) == 2 {
+		if contentFits {
+			return append(stack, flat(sep), flat(content))
+		}
+		return append(stack, brk(sep), brk(content))
+	}
+	stack = append(stack, cmd{c.indent, c.mode, Fill{parts[2:]}})
+	if fits(flat(Cat{content, sep, parts[2]}), nil, width, opts) {
+		return append(stack, flat(sep), flat(content))
+	}
+	if contentFits {
+		return append(stack, brk(sep), flat(content))
+	}
+	return append(stack, brk(sep), brk(content))
 }
 
 // fits reports whether next, followed by the rest of the stack, stays within
@@ -156,6 +193,10 @@ func fits(next cmd, rest []cmd, width int, opts Options) bool {
 			}
 		case Detach:
 			stack = append(stack, cmd{c.indent, modeBreak, x.D})
+		case Fill:
+			for i := len(x.Parts) - 1; i >= 0; i-- {
+				stack = append(stack, cmd{c.indent, c.mode, x.Parts[i]})
+			}
 		case LiteralLine:
 			return true
 		case Line:
@@ -185,6 +226,14 @@ func propagateBreaks(d Doc) bool {
 		return forced
 	case Indent:
 		return propagateBreaks(x.D)
+	case Fill:
+		forced := false
+		for _, c := range x.Parts {
+			if propagateBreaks(c) {
+				forced = true
+			}
+		}
+		return forced
 	case *Group:
 		if propagateBreaks(x.D) {
 			x.Break = true

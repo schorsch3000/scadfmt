@@ -10,7 +10,7 @@ import (
 // fits, else one item per line. A trailing comma present in the source is kept
 // only when the list is broken. With hug, a single bracketed item stays
 // attached to the delimiters instead of moving to its own line.
-func (p *printer) delimited(open tok, items []doc.Doc, commas []tok, close tok, hug bool) doc.Doc {
+func (p *printer) delimited(open tok, items []doc.Doc, commas []tok, close tok, hug, force bool) doc.Doc {
 	inside, closeDoc := p.closer(close)
 	if len(items) == 0 {
 		if isNil(inside) {
@@ -18,7 +18,7 @@ func (p *printer) delimited(open tok, items []doc.Doc, commas []tok, close tok, 
 		}
 		return doc.NewGroup(p.tok(open), doc.Nest(inside), doc.Hardline, closeDoc)
 	}
-	if hug && len(items) == 1 && len(commas) == 0 && isNil(inside) {
+	if hug && !force && len(items) == 1 && len(commas) == 0 && isNil(inside) {
 		return doc.Concat(p.tok(open), items[0], closeDoc)
 	}
 	var body []doc.Doc
@@ -36,12 +36,23 @@ func (p *printer) delimited(open tok, items []doc.Doc, commas []tok, close tok, 
 			}
 		}
 	}
+	var forceBreak doc.Doc = doc.Nil
+	if force {
+		forceBreak = doc.BreakParent{}
+	}
 	return doc.NewGroup(
 		p.tok(open),
 		doc.Nest(doc.Concat(doc.Softline, doc.Concat(body...), inside)),
 		doc.Softline,
 		closeDoc,
+		forceBreak,
 	)
+}
+
+// startsOnNewLine reports whether the first item of a bracketed list sits on a
+// later source line than the opening bracket.
+func startsOnNewLine(open tok, first syntax.Node) bool {
+	return first.First().Pos.Line > open.Pos.Line
 }
 
 func isNil(d doc.Doc) bool {
@@ -56,7 +67,9 @@ func (p *printer) args(lp tok, l syntax.List, rp tok, hug bool) doc.Doc {
 		items[i] = p.arg(a)
 	}
 	hugOK := hug && len(l.Items) == 1 && l.Items[0].Name == nil && isVector(l.Items[0].Value)
-	return p.delimited(lp, items, l.Commas, rp, hugOK)
+	// An argument list that starts on a new line in the source stays broken.
+	force := p.opts.Matrix != MatrixReflow && len(l.Items) > 0 && startsOnNewLine(lp, l.Items[0])
+	return p.delimited(lp, items, l.Commas, rp, hugOK, force)
 }
 
 func isVector(e syntax.Expr) bool {
@@ -103,11 +116,7 @@ func (p *printer) expr(e syntax.Expr) doc.Doc {
 	case *syntax.Member:
 		return doc.Concat(p.expr(n.X), p.tok(n.Dot), p.tok(n.Name))
 	case *syntax.Vector:
-		items := make([]doc.Doc, len(n.Elems))
-		for i, x := range n.Elems {
-			items[i] = p.expr(x)
-		}
-		return p.delimited(n.LBracket, items, n.Commas, n.RBracket, false)
+		return p.vector(n)
 	case *syntax.Range:
 		return p.rangeExpr(n)
 	case *syntax.FuncLit:
@@ -278,4 +287,90 @@ func (p *printer) lcIf(n *syntax.LcIf) doc.Doc {
 		parts = append(parts, doc.LineBr, p.tok(n.Else), doc.Nest(doc.Concat(doc.LineBr, p.expr(n.ElseBody))))
 	}
 	return doc.NewGroup(parts...)
+}
+
+// ---- vectors ----
+
+// multiline reports whether the vector was written over several lines in the
+// source: its first element is on a later line than `[`, or some element
+// starts on a later line than the one before it.
+func multiline(n *syntax.Vector) bool {
+	if len(n.Elems) == 0 {
+		return false
+	}
+	if startsOnNewLine(n.LBracket, n.Elems[0]) {
+		return true
+	}
+	for i := 1; i < len(n.Elems); i++ {
+		if n.Elems[i].First().Pos.Line > n.Elems[i-1].Last().Pos.Line {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *printer) vector(n *syntax.Vector) doc.Doc {
+	if p.opts.Matrix != MatrixReflow && multiline(n) {
+		return p.vectorRows(n)
+	}
+	items := make([]doc.Doc, len(n.Elems))
+	for i, x := range n.Elems {
+		items[i] = p.expr(x)
+	}
+	return p.delimited(n.LBracket, items, n.Commas, n.RBracket, false, false)
+}
+
+// vectorRows prints a vector that was multi-line in the source: `[` and `]`
+// on their own lines, and the elements grouped into the same rows as in the
+// source. A row that is too long wraps. One blank line between rows is kept.
+func (p *printer) vectorRows(n *syntax.Vector) doc.Doc {
+	inside, closeDoc := p.closer(n.RBracket)
+
+	// Split into rows by source line.
+	var rows [][]int
+	for i := range n.Elems {
+		if i == 0 || n.Elems[i].First().Pos.Line > n.Elems[i-1].Last().Pos.Line {
+			rows = append(rows, nil)
+		}
+		rows[len(rows)-1] = append(rows[len(rows)-1], i)
+	}
+
+	var body []doc.Doc
+	for r, row := range rows {
+		if r > 0 {
+			body = append(body, doc.Hardline)
+			if p.blankBefore(n.Elems[row[0]].First()) {
+				body = append(body, doc.Hardline)
+			}
+		}
+		// Comments before the row's first element go above the row, outside
+		// the fill, so they do not make the row wrap.
+		first := n.Elems[row[0]].First()
+		lead := p.leading(first)
+		p.skipLeading = first
+		var parts []doc.Doc
+		for k, i := range row {
+			cell := p.expr(n.Elems[i])
+			p.skipLeading = nil
+			if i < len(n.Commas) {
+				comma := n.Commas[i]
+				if k == len(row)-1 {
+					cell = doc.Concat(cell, p.tokNoBreak(comma)) // a line break follows
+				} else {
+					cell = doc.Concat(cell, p.tok(comma))
+				}
+			}
+			if k > 0 {
+				parts = append(parts, doc.LineBr)
+			}
+			parts = append(parts, cell)
+		}
+		body = append(body, lead, doc.Fill{Parts: parts})
+	}
+	return doc.Concat(
+		p.tok(n.LBracket),
+		doc.Nest(doc.Concat(doc.Hardline, doc.Concat(body...), inside)),
+		doc.Hardline,
+		closeDoc,
+	)
 }

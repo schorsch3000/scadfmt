@@ -14,6 +14,10 @@ type printer struct {
 	index map[tok]int
 	info  comments.Map
 	opts  Options
+
+	// skipLeading, when set, is a token whose leading comments are not printed
+	// (the caller printed them already).
+	skipLeading tok
 }
 
 func newPrinter(toks []lexer.Token, opts Options) *printer {
@@ -120,7 +124,7 @@ func (p *printer) hasLeading(t tok) bool { return len(p.info[t].Leading) > 0 }
 // leading prints the comments before t.
 func (p *printer) leading(t tok) doc.Doc {
 	info := p.info[t]
-	if len(info.Leading) == 0 {
+	if len(info.Leading) == 0 || t == p.skipLeading {
 		return doc.Nil
 	}
 	if (t.Kind == lexer.Comma || t.Kind == lexer.Semicolon) && p.inlineLeading(t) {
@@ -156,7 +160,15 @@ func (p *printer) leading(t tok) doc.Doc {
 // trailing prints the comments that follow t on its line. They are deferred to
 // the end of the line; for tokens inside brackets they also force the
 // enclosing group to break, so the comment stays next to what it annotates.
-func (p *printer) trailing(t tok) doc.Doc {
+func (p *printer) trailing(t tok) doc.Doc { return p.trailingComments(t, true) }
+
+// tokNoBreak prints t with its comments, but a trailing comment does not force
+// the enclosing group to break. Use it where a line break follows anyway.
+func (p *printer) tokNoBreak(t tok) doc.Doc {
+	return doc.Concat(p.leading(t), p.text(t), p.trailingComments(t, false))
+}
+
+func (p *printer) trailingComments(t tok, forceBreak bool) doc.Doc {
 	cs := p.info[t].Trailing
 	if len(cs) == 0 {
 		return doc.Nil
@@ -168,7 +180,9 @@ func (p *printer) trailing(t tok) doc.Doc {
 	switch t.Kind {
 	case lexer.Semicolon, lexer.LBrace, lexer.RBrace:
 	default:
-		parts = append(parts, doc.BreakParent{})
+		if forceBreak {
+			parts = append(parts, doc.BreakParent{})
+		}
 	}
 	return doc.Concat(parts...)
 }

@@ -25,8 +25,7 @@ cube([
 f(a /* c */, b);
 x = [
   // leading
-  1,
-  2,
+  1, 2,
   // before close
 ];
 translate([1, 2, 3]) // moves it

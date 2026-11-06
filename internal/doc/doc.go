@@ -44,6 +44,11 @@ type (
 	// comments and strings.
 	LiteralLine struct{}
 
+	// Fill lays out Parts, which alternate content, separator, content, ...,
+	// putting as much content on each line as fits. Each separator (normally a
+	// Line) breaks only if the following content would not fit after it.
+	Fill struct{ Parts []Doc }
+
 	// Detach prints D in broken mode and hides any forced break inside D from
 	// the enclosing groups. It lets a trailing `{ ... }` block hang off a group
 	// without forcing that group to break.
@@ -60,6 +65,7 @@ func (LineSuffix) isDoc()  {}
 func (BreakParent) isDoc() {}
 func (LiteralLine) isDoc() {}
 func (Detach) isDoc()      {}
+func (Fill) isDoc()        {}
 
 // Common constructors and singletons.
 var (

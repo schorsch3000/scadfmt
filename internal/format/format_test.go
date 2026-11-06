@@ -75,3 +75,41 @@ func TestSyntaxErrorReported(t *testing.T) {
 		t.Error("want error")
 	}
 }
+
+func TestMatrixModes(t *testing.T) {
+	src := "m = [[1,0],\n     [0,1]];\nf(\n  a, b);\n"
+	preserve := "m = [\n  [1, 0],\n  [0, 1]\n];\nf(\n  a,\n  b\n);\n"
+	reflow := "m = [[1, 0], [0, 1]];\nf(a, b);\n"
+	for mode, want := range map[string]string{
+		MatrixPreserve: preserve,
+		MatrixAlign:    preserve, // until column alignment exists
+		MatrixReflow:   reflow,
+	} {
+		got := fmtWith(t, src, func(o *Options) { o.Matrix = mode })
+		if got != want {
+			t.Errorf("%s: got %q want %q", mode, got, want)
+		}
+	}
+}
+
+func TestPreservedRowsKeepGrouping(t *testing.T) {
+	src := "x = [1, 2,\n     3, 4,\n     5];\n"
+	want := "x = [\n  1, 2,\n  3, 4,\n  5\n];\n"
+	if got := fmtWith(t, src, nil); got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
+}
+
+func TestLongRowWrapsAsFill(t *testing.T) {
+	src := "x = [\n  1111, 2222, 3333, 4444, 5555, 6666\n];\n"
+	got := fmtWith(t, src, func(o *Options) { o.MaxWidth = 20 })
+	want := "x = [\n  1111, 2222, 3333,\n  4444, 5555, 6666\n];\n"
+	if got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
+	// Formatting the wrapped result again must not change it.
+	again := fmtWith(t, got, func(o *Options) { o.MaxWidth = 20 })
+	if again != got {
+		t.Errorf("not idempotent: %q", again)
+	}
+}

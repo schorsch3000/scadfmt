@@ -14,17 +14,25 @@ const (
 	ChainBreak = "break" // always one call per line
 )
 
+// Matrix layouts for vectors and argument lists written over several lines.
+const (
+	MatrixPreserve = "preserve" // keep the source's line structure
+	MatrixReflow   = "reflow"   // lay out by width only
+	MatrixAlign    = "align"    // preserve, and align columns (not yet implemented)
+)
+
 // Options controls formatting output.
 type Options struct {
 	MaxWidth int
 	Indent   int
 	UseTabs  bool
 	Chain    string // ChainAuto, ChainFlat or ChainBreak
+	Matrix   string // MatrixPreserve, MatrixReflow or MatrixAlign
 }
 
 // DefaultOptions returns the default formatting options.
 func DefaultOptions() Options {
-	return Options{MaxWidth: 100, Indent: 2, Chain: ChainAuto}
+	return Options{MaxWidth: 100, Indent: 2, Chain: ChainAuto, Matrix: MatrixPreserve}
 }
 
 // Format formats src. It fails if src does not lex and parse.

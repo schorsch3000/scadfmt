@@ -138,3 +138,21 @@ func TestRestOfLineCountsForFit(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+func TestFill(t *testing.T) {
+	words := []string{"aaa,", "bbb,", "ccc,", "ddd,", "eee"}
+	var parts []Doc
+	for i, w := range words {
+		if i > 0 {
+			parts = append(parts, LineBr)
+		}
+		parts = append(parts, Text(w))
+	}
+	d := Fill{parts}
+	if got := p(d, 80); got != "aaa, bbb, ccc, ddd, eee" {
+		t.Errorf("fits: %q", got)
+	}
+	if got := p(d, 10); got != "aaa, bbb,\nccc, ddd,\neee" {
+		t.Errorf("wrapped: %q", got)
+	}
+}
