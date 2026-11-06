@@ -12,6 +12,7 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/schorsch3000/scadfmt/internal/completion"
 	"github.com/schorsch3000/scadfmt/internal/config"
 	"github.com/schorsch3000/scadfmt/internal/format"
 )
@@ -50,6 +51,7 @@ func main() {
 type flags struct {
 	write, check, noConfig bool
 	showVersion            bool
+	completion             string
 	configPath, preset     string
 	stdinPath              string
 
@@ -57,8 +59,8 @@ type flags struct {
 	set  map[string]bool
 }
 
-func parseFlags(args []string, stderr io.Writer) (*flags, []string, error) {
-	fl := &flags{opts: format.DefaultOptions(), set: map[string]bool{}}
+// newFlagSet declares every command-line flag, storing the values in fl.
+func newFlagSet(fl *flags, stderr io.Writer) *flag.FlagSet {
 	fs := flag.NewFlagSet("scadfmt", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
@@ -68,6 +70,7 @@ func parseFlags(args []string, stderr io.Writer) (*flags, []string, error) {
 	fs.BoolVar(&fl.write, "w", false, "write result to the source file instead of stdout")
 	fs.BoolVar(&fl.check, "check", false, "list files whose formatting differs; exit 1 if any")
 	fs.BoolVar(&fl.showVersion, "version", false, "print the version and exit")
+	fs.StringVar(&fl.completion, "completion", "", "print a shell completion script ("+strings.Join(completion.Shells(), ", ")+") and exit")
 	fs.StringVar(&fl.configPath, "config", "", "use this config file instead of searching for "+config.FileName)
 	fs.BoolVar(&fl.noConfig, "no-config", false, "ignore config files")
 	fs.StringVar(&fl.preset, "preset", "", "start from a preset: default or pretty")
@@ -86,12 +89,46 @@ func parseFlags(args []string, stderr io.Writer) (*flags, []string, error) {
 	fs.BoolVar(&o.AlignTrailingComments, "align-trailing-comments", false, "align // comments after consecutive statements")
 	fs.IntVar(&o.AlignMaxGap, "align-max-gap", o.AlignMaxGap, "split an alignment group when widths differ by more (0: no limit)")
 	fs.BoolVar(&o.NormalizeNumbers, "normalize-numbers", false, "rewrite .5 as 0.5 and 1.50 as 1.5")
+	return fs
+}
 
+func parseFlags(args []string, stderr io.Writer) (*flags, []string, error) {
+	fl := &flags{opts: format.DefaultOptions(), set: map[string]bool{}}
+	fs := newFlagSet(fl, stderr)
 	if err := fs.Parse(args); err != nil {
 		return nil, nil, err
 	}
 	fs.Visit(func(f *flag.Flag) { fl.set[f.Name] = true })
 	return fl, fs.Args(), nil
+}
+
+// flagChoices lists the valid values of the flags that take one of a fixed set
+// of words. They come from the same constants the options are validated against.
+var flagChoices = map[string][]string{
+	"chain":        {format.ChainAuto, format.ChainFlat, format.ChainBreak},
+	"chain-indent": {format.ChainIndentStep, format.ChainIndentSame},
+	"matrix":       {format.MatrixPreserve, format.MatrixReflow, format.MatrixAlign},
+	"preset":       config.PresetNames,
+	"completion":   completion.Shells(),
+}
+
+// fileFlags take a file name.
+var fileFlags = map[string]bool{"config": true, "stdin-filepath": true}
+
+// completionFlags describes the command line for the completion generator.
+func completionFlags() []completion.Flag {
+	var out []completion.Flag
+	newFlagSet(&flags{}, io.Discard).VisitAll(func(f *flag.Flag) {
+		isBool := false
+		if b, ok := f.Value.(interface{ IsBoolFlag() bool }); ok {
+			isBool = b.IsBoolFlag()
+		}
+		out = append(out, completion.Flag{
+			Name: f.Name, Usage: f.Usage, Bool: isBool,
+			Values: flagChoices[f.Name], File: fileFlags[f.Name],
+		})
+	})
+	return out
 }
 
 // optionsFor resolves the options for a file in dir: defaults, preset, config
@@ -174,6 +211,15 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 0
 		}
 		return 2
+	}
+	if fl.completion != "" {
+		script, err := completion.Generate(fl.completion, "scadfmt", completionFlags())
+		if err != nil {
+			fmt.Fprintln(stderr, "scadfmt:", err)
+			return 2
+		}
+		fmt.Fprint(stdout, script)
+		return 0
 	}
 	if fl.showVersion {
 		fmt.Fprintln(stdout, "scadfmt", versionString())

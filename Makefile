@@ -51,17 +51,22 @@ corpus: ## Fetch the pinned OpenSCAD source into ./openscad if missing
 	fi
 
 dist: ## Cross-compile release archives and SHA256SUMS into ./dist
-	rm -rf dist && mkdir -p dist
+	rm -rf dist && mkdir -p dist/completions
+	go run ./cmd/scadfmt --completion=bash > dist/completions/scadfmt.bash
+	go run ./cmd/scadfmt --completion=zsh  > dist/completions/_scadfmt
+	go run ./cmd/scadfmt --completion=fish > dist/completions/scadfmt.fish
 	@set -e; for p in $(PLATFORMS); do \
 		os=$${p%/*}; arch=$${p#*/}; ext=""; [ "$$os" = windows ] && ext=.exe; \
 		name=$(BINARY)_$(VERSION)_$${os}_$${arch}; \
 		echo "building $$name"; \
 		mkdir -p dist/$$name; \
+		cp -r dist/completions dist/$$name/completions; \
 		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags "$(LDFLAGS)" -o dist/$$name/$(BINARY)$$ext ./cmd/scadfmt; \
 		if [ "$$os" = windows ]; then (cd dist && zip -qr $$name.zip $$name); \
 		else tar -C dist -czf dist/$$name.tar.gz $$name; fi; \
 		rm -rf dist/$$name; \
 	done
+	rm -rf dist/completions
 	cd dist && sha256sum * > SHA256SUMS
 
 clean: ## Remove build output

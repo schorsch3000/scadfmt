@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -130,6 +131,9 @@ func (c *Config) validate() error {
 	return Check(o)
 }
 
+// PresetNames lists the names Preset accepts.
+var PresetNames = []string{"default", "pretty"}
+
 // Preset returns the changes a named preset makes to the default options.
 //
 //	pretty: turn on all alignment options, including matrix column alignment.
@@ -146,7 +150,7 @@ func Preset(name string) (func(*format.Options), error) {
 	case "default":
 		return func(*format.Options) {}, nil
 	}
-	return nil, fmt.Errorf("unknown preset %q (have: default, pretty)", name)
+	return nil, fmt.Errorf("unknown preset %q (have: %s)", name, strings.Join(PresetNames, ", "))
 }
 
 // Options builds format options from the defaults, then the preset, then c.
