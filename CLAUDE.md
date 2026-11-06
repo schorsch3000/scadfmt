@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project goal
 
-`scadfmt` = code formatter for OpenSCAD (`.scad`) files. Existing formatters use string/regex matching and produce broken output. This one must build a real AST and re-emit the file deterministically. See `idea.md`.
+`scadfmt` = code formatter for OpenSCAD (`.scad`) files. Existing formatters use string/regex matching and produce broken output. This one must build a real AST and re-emit the file deterministically.
 
-Repo state: formatter itself not written yet. Only `idea.md` and a vendored OpenSCAD checkout in `openscad/` (upstream commit `a81e863`, has own `.git`, untracked by the outer repo). `.az/` and `.idea/` are tooling dirs, ignore.
+`openscad/` is a vendored OpenSCAD checkout (upstream commit `a81e863`, has its own `.git`), git-ignored by this repo and used only as grammar reference and test corpus. `.az/` and `.idea/` are tooling dirs, also ignored.
 
 ## OpenSCAD source as reference (`openscad/`)
 
@@ -22,7 +22,7 @@ Files that matter for a formatter:
 
 Inspect AST of a file with a built OpenSCAD binary: `openscad -o - --export-format ast file.scad`.
 
-## Design constraints (from idea.md)
+## Design constraints
 
 - AST-based, never regex/string-pattern rewriting.
 - Deterministic and idempotent: `fmt(fmt(x)) == fmt(x)`.
