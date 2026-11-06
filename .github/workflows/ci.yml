@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Keep in sync with OPENSCAD_REF in the Makefile.
+  OPENSCAD_REF: a81e863051c42ee04168683e945aca58d32d04a2
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, go ${{ matrix.go }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        go: ['1.22', stable]
+        include:
+          - os: macos-latest
+            go: stable
+          - os: windows-latest
+            go: stable
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      # The corpus tests format every .scad file of OpenSCAD's own test suite.
+      # They skip themselves when ./openscad is missing, so only run them once.
+      - name: Check out OpenSCAD (test corpus)
+        if: matrix.os == 'ubuntu-latest' && matrix.go == 'stable'
+        uses: actions/checkout@v4
+        with:
+          repository: openscad/openscad
+          ref: ${{ env.OPENSCAD_REF }}
+          path: openscad
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l cmd internal)
+          if [ -n "$unformatted" ]; then
+            echo "not gofmt-formatted:"; echo "$unformatted"; exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: |
+          flags=""
+          if [ "$RUNNER_OS" = Linux ]; then flags="-race"; fi
+          go test $flags ./...
+
+      - name: Build
+        run: go build ./...

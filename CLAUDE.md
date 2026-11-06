@@ -71,7 +71,9 @@ Tracked in git-bug (`git bug bug`, close with `git bug bug status close <id>`). 
 
 Go lives in `/usr/local/go/bin`, not on PATH by default: `export PATH=$PATH:/usr/local/go/bin`.
 
-- Build: `go build -o scadfmt ./cmd/scadfmt`
+- Module path: `github.com/schorsch3000/scadfmt` (so `go install github.com/schorsch3000/scadfmt/cmd/scadfmt@latest` works). `go.mod` says `go 1.22`; CI also tests the latest Go, so don't use newer language/library features than that.
+- `make` targets (`make help` lists them): `build`, `test`, `check` (gofmt + vet + test, what CI runs), `fuzz`, `corpus` (fetch the pinned OpenSCAD source into `./openscad`, ~2 min), `dist` (cross-compile release archives), `clean`.
+- Build: `make build` (or `go build -o scadfmt ./cmd/scadfmt`); `scadfmt -version` prints the stamped version
 - Test all: `go test ./...`
 - Single test: `go test ./internal/format -run TestGolden/simple`
 - Run: `scadfmt [-w] [-check] [files...]` (stdin when no files)
@@ -82,3 +84,9 @@ Go lives in `/usr/local/go/bin`, not on PATH by default: `export PATH=$PATH:/usr
 - Layout-engine rules learned from fuzzing: a trailing comment is a `LineSuffix{EndsLine: true}` (text that would follow it on the line forces a break first), and an own-line comment starts with `EnsureNewline`, so comments never change attachment between runs.
 - Don't run `pkill -f "go test"` from the shell tool; it matches (and kills) its own command line.
 - Golden tests: `testdata/golden/<name>.in.scad` + `<name>.out.scad`; the runner also asserts idempotency.
+
+## CI and releases
+
+- `.github/workflows/ci.yml` runs on pushes to `main` and on pull requests: gofmt check, `go vet`, `go test` on Ubuntu (Go 1.22 and latest, with `-race`), plus macOS and Windows on latest Go. The Ubuntu/latest job also checks out OpenSCAD at the pinned commit so the corpus tests run; keep `OPENSCAD_REF` there, in `release.yml` and in the `Makefile` in sync. `.gitattributes` forces LF so golden files match on Windows.
+- `.github/workflows/release.yml` runs when a tag `vX.Y.Z` (or `vX.Y.Z-suffix`, published as a pre-release) is pushed. It requires the tag to be on `main`, re-runs vet and tests, builds linux/darwin/windows x amd64/arm64 archives with `make dist` (version stamped via `-ldflags -X main.version=`), and creates the GitHub release with generated notes and `SHA256SUMS`. To release: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+- Neither workflow has run yet (they were validated only as YAML, and the Windows/macOS/Go 1.22 jobs are untested), so expect to fix small things on the first push.
