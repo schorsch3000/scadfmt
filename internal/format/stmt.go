@@ -199,11 +199,17 @@ func nest(levels int, d doc.Doc) doc.Doc {
 // stays on one line, the tail is not indented.
 func (p *printer) join(heads []doc.Doc, t tail, commented bool) doc.Doc {
 	n := len(heads)
+	same := p.opts.ChainIndent == ChainIndentSame
+	// Indent levels of the last call and of an if that follows it.
+	lastLevel, ifLevel := n-1, n
+	if same {
+		lastLevel, ifLevel = min(n-1, 1), 1
+	}
 	brokenTail := func() doc.Doc {
 		if t.isIf {
-			return nest(n, doc.Concat(doc.Hardline, t.d))
+			return nest(ifLevel, doc.Concat(doc.Hardline, t.d))
 		}
-		return nest(n-1, t.d)
+		return nest(lastLevel, t.d)
 	}
 	flatTail := func() doc.Doc {
 		if t.isIf {
@@ -212,6 +218,13 @@ func (p *printer) join(heads []doc.Doc, t tail, commented bool) doc.Doc {
 		return t.d
 	}
 	build := func(sep doc.Doc) doc.Doc {
+		if same {
+			rest := make([]doc.Doc, 0, 2*n)
+			for _, h := range heads[1:] {
+				rest = append(rest, sep, h)
+			}
+			return doc.Concat(heads[0], doc.Nest(doc.Concat(rest...)))
+		}
 		d := heads[n-1]
 		for i := n - 2; i >= 0; i-- {
 			d = doc.Concat(heads[i], doc.Nest(doc.Concat(sep, d)))

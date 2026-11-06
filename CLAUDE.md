@@ -40,6 +40,7 @@ max_width: 100
 indent: 2
 use_tabs: false
 chain: auto            # break | flat | auto  (long transform chains)
+chain_indent: step     # step | same  (how a broken chain is indented)
 matrix: preserve       # preserve | reflow | align
 align:
   assignments: false   # align `=` in consecutive assignments
@@ -62,7 +63,7 @@ numbers:
 
 ## Milestones
 
-Tracked in git-bug (`git bug bug`, close with `git bug bug status close <id>`). M0-M7 are done; M8 (YAML config, CLI flags, `--preset pretty`) and M9 (AST-equivalence check against `openscad`) remain.
+Tracked in git-bug (`git bug bug`, close with `git bug bug status close <id>`). M0-M8 are done; M9 (AST-equivalence check against `openscad`, fuzzing) remains.
 
 ## Commands
 
@@ -72,7 +73,9 @@ Go lives in `/usr/local/go/bin`, not on PATH by default: `export PATH=$PATH:/usr
 - Test all: `go test ./...`
 - Single test: `go test ./internal/format -run TestGolden/simple`
 - Run: `scadfmt [-w] [-check] [files...]` (stdin when no files)
-- Package layout: `internal/lexer` (tokens + trivia) -> `internal/syntax` (CST) -> `internal/comments` (comment placement) -> `internal/format` (CST to docs) -> `internal/doc` (layout).
+- Package layout: `internal/lexer` (tokens + trivia) -> `internal/syntax` (CST) -> `internal/comments` (comment placement) -> `internal/format` (CST to docs) -> `internal/doc` (layout). `internal/config` reads `.scadfmt.yaml` (strict, via `gopkg.in/yaml.v3`) and presets; `cmd/scadfmt` adds flags.
+- Option precedence: defaults < preset < `.scadfmt.yaml` (nearest in the file's directory or a parent) < CLI flags. Only flags actually given override (tracked with `flag.Visit`). Add a new option in `format.Options`, `config.Config`/`Options`/`Check`, and as a flag in `cmd/scadfmt/main.go` + `applyFlags`.
+- Extra option beyond the original design: `chain_indent: step|same` (indent of broken transform chains).
 - Corpus property test (`internal/format/corpus_test.go`): formats every `.scad` in `openscad/` in several option sets and checks tokens/comments preserved, output parses, idempotent. Run it after any printer change.
 - Don't run `pkill -f "go test"` from the shell tool; it matches (and kills) its own command line.
 - Golden tests: `testdata/golden/<name>.in.scad` + `<name>.out.scad`; the runner also asserts idempotency.

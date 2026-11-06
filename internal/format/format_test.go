@@ -113,3 +113,20 @@ func TestLongRowWrapsAsFill(t *testing.T) {
 		t.Errorf("not idempotent: %q", again)
 	}
 }
+
+func TestChainIndentSame(t *testing.T) {
+	src := "translate([1,0,0]) rotate(90) cube(1);\n"
+	same := func(o *Options) { o.Chain = ChainBreak; o.ChainIndent = ChainIndentSame }
+	if got, want := fmtWith(t, src, same), "translate([1, 0, 0])\n  rotate(90)\n  cube(1);\n"; got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
+	src = "translate(1) rotate(2) { cube(1); }\n"
+	want := "translate(1)\n  rotate(2) {\n    cube(1);\n  }\n"
+	if got := fmtWith(t, src, same); got != want {
+		t.Errorf("block: got %q want %q", got, want)
+	}
+	// Default is unchanged.
+	if got, want := fmtWith(t, "a() b() c();\n", func(o *Options) { o.Chain = ChainBreak }), "a()\n  b()\n    c();\n"; got != want {
+		t.Errorf("step: got %q want %q", got, want)
+	}
+}

@@ -14,6 +14,12 @@ const (
 	ChainBreak = "break" // always one call per line
 )
 
+// How the calls of a broken chain are indented.
+const (
+	ChainIndentStep = "step" // each call one step deeper than the one before
+	ChainIndentSame = "same" // all calls after the first at the same depth
+)
+
 // Matrix layouts for vectors and argument lists written over several lines.
 const (
 	MatrixPreserve = "preserve" // keep the source's line structure
@@ -27,7 +33,11 @@ type Options struct {
 	Indent   int
 	UseTabs  bool
 	Chain    string // ChainAuto, ChainFlat or ChainBreak
-	Matrix   string // MatrixPreserve, MatrixReflow or MatrixAlign
+
+	// ChainIndent is ChainIndentStep or ChainIndentSame. It only matters when a
+	// chain breaks over several lines.
+	ChainIndent string
+	Matrix      string // MatrixPreserve, MatrixReflow or MatrixAlign
 
 	// Alignment. All off by default. Each pads with spaces only and never
 	// changes the text of a token. AlignDecimal needs AlignAssignments.
@@ -44,7 +54,7 @@ type Options struct {
 
 // DefaultOptions returns the default formatting options.
 func DefaultOptions() Options {
-	return Options{MaxWidth: 100, Indent: 2, Chain: ChainAuto, Matrix: MatrixPreserve, AlignMaxGap: 8}
+	return Options{MaxWidth: 100, Indent: 2, Chain: ChainAuto, ChainIndent: ChainIndentStep, Matrix: MatrixPreserve, AlignMaxGap: 8}
 }
 
 // Format formats src. It fails if src does not lex and parse.
