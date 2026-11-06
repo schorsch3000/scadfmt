@@ -1,6 +1,11 @@
 package format
 
-import "testing"
+import (
+	"testing"
+
+	"scadfmt/internal/lexer"
+	"scadfmt/internal/syntax"
+)
 
 func fmtWith(t *testing.T, src string, mut func(*Options)) string {
 	t.Helper()
@@ -128,5 +133,32 @@ func TestChainIndentSame(t *testing.T) {
 	// Default is unchanged.
 	if got, want := fmtWith(t, "a() b() c();\n", func(o *Options) { o.Chain = ChainBreak }), "a()\n  b()\n    c();\n"; got != want {
 		t.Errorf("step: got %q want %q", got, want)
+	}
+}
+
+// verify must reject output that is a different program or lost a comment.
+func TestVerifyRejectsBadOutput(t *testing.T) {
+	src := []byte("x = a + b * c; // keep\n")
+	toks, err := lexer.Lex(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree, err := syntax.Parse(toks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := DefaultOptions()
+	if err := verify(toks, tree, []byte("x = a + b * c; // keep\n"), opts); err != nil {
+		t.Errorf("identical output rejected: %v", err)
+	}
+	for name, bad := range map[string]string{
+		"changed precedence": "x = (a + b) * c; // keep\n",
+		"lost comment":       "x = a + b * c;\n",
+		"edited comment":     "x = a + b * c; // changed\n",
+		"not parseable":      "x = a + ;\n",
+	} {
+		if err := verify(toks, tree, []byte(bad), opts); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"scadfmt/internal/lexer"
+	"scadfmt/internal/syntax"
 )
 
 // signature returns the token texts of src without trailing commas (which the
@@ -23,7 +24,7 @@ func signature(t *testing.T, name string, src []byte) (toks, cmts []string) {
 			if tr.Kind == lexer.LineComment || tr.Kind == lexer.BlockComment {
 				c := tr.Text
 				if tr.Kind == lexer.LineComment {
-					c = strings.TrimRight(c, " \t")
+					c = strings.TrimRight(c, " \t\r")
 				} else {
 					// Re-indentation of doc comments may change leading blanks.
 					lines := strings.Split(c, "\n")
@@ -79,6 +80,11 @@ func TestCorpus(t *testing.T) {
 			return nil
 		}
 		src, _ := os.ReadFile(p)
+		if toks, err := lexer.Lex(src); err != nil {
+			return nil // deliberately invalid file
+		} else if _, err := syntax.Parse(toks); err != nil {
+			return nil
+		}
 		for _, chain := range []string{ChainAuto, ChainFlat, ChainBreak, "all-align"} {
 			opts := DefaultOptions()
 			opts.Chain = chain
@@ -90,7 +96,8 @@ func TestCorpus(t *testing.T) {
 			}
 			out, err := Format(src, opts)
 			if err != nil {
-				return nil // deliberately invalid file
+				t.Errorf("%s [%s]: %v", p, chain, err)
+				continue
 			}
 			if chain == ChainAuto {
 				n++

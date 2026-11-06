@@ -2,6 +2,8 @@
 package format
 
 import (
+	"fmt"
+
 	"scadfmt/internal/doc"
 	"scadfmt/internal/lexer"
 	"scadfmt/internal/syntax"
@@ -57,7 +59,9 @@ func DefaultOptions() Options {
 	return Options{MaxWidth: 100, Indent: 2, Chain: ChainAuto, ChainIndent: ChainIndentStep, Matrix: MatrixPreserve, AlignMaxGap: 8}
 }
 
-// Format formats src. It fails if src does not lex and parse.
+// Format formats src. It fails if src does not lex and parse. It also checks
+// its own output: if the result is not the same program as src, or a comment
+// was lost, it returns an error instead of the result.
 func Format(src []byte, opts Options) ([]byte, error) {
 	toks, err := lexer.Lex(src)
 	if err != nil {
@@ -73,5 +77,8 @@ func Format(src []byte, opts Options) ([]byte, error) {
 		Indent:   opts.Indent,
 		UseTabs:  opts.UseTabs,
 	})
+	if err := verify(toks, f, []byte(out), opts); err != nil {
+		return nil, fmt.Errorf("internal error, refusing to change the file (please report this): %w", err)
+	}
 	return []byte(out), nil
 }

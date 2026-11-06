@@ -55,15 +55,17 @@ numbers:
 - Defaults: matrix `preserve`, all align options off. `--preset pretty` turns the align options on.
 - Alignment groups end at a blank line, a non-assignment statement, or a block boundary. Alignment falls back to unaligned if the group exceeds `max_width`.
 
-## Verification plan
+## Verification
 
 - Idempotency: `fmt(fmt(x)) == fmt(x)`.
-- Semantics: `openscad -o - --export-format ast` of input vs. output must be equal.
+- Built-in self-check: `format.Format` re-parses its own output and compares it with the input tree (`syntax.Equal`, `internal/format/verify.go`), and checks that every comment survived. On mismatch it returns an error instead of output, so a printer bug cannot silently change a file. `Equal` ignores layout, trailing commas, and the space in `include <...>`.
+- Independent oracle: `TestOpenSCADAgrees` compares `openscad -o - --export-format ast` of input vs. output. It skips without an `openscad` binary (set `OPENSCAD=path`), and has never been run in this environment (no binary, no cmake/CGAL to build one), so treat it as unverified.
+- Fuzzing: `go test ./internal/format -run XXX -fuzz=FuzzFormat -fuzztime=60s`. Any input that parses must format without error and be idempotent. Failing inputs land in `internal/format/testdata/fuzz/` and are replayed by plain `go test`; commit them.
 - Corpus: `openscad/tests/data/scad/**`, `openscad/examples/**`.
 
 ## Milestones
 
-Tracked in git-bug (`git bug bug`, close with `git bug bug status close <id>`). M0-M8 are done; M9 (AST-equivalence check against `openscad`, fuzzing) remains.
+Tracked in git-bug (`git bug bug`, close with `git bug bug status close <id>`). All milestones M0-M9 are done.
 
 ## Commands
 
@@ -77,5 +79,6 @@ Go lives in `/usr/local/go/bin`, not on PATH by default: `export PATH=$PATH:/usr
 - Option precedence: defaults < preset < `.scadfmt.yaml` (nearest in the file's directory or a parent) < CLI flags. Only flags actually given override (tracked with `flag.Visit`). Add a new option in `format.Options`, `config.Config`/`Options`/`Check`, and as a flag in `cmd/scadfmt/main.go` + `applyFlags`.
 - Extra option beyond the original design: `chain_indent: step|same` (indent of broken transform chains).
 - Corpus property test (`internal/format/corpus_test.go`): formats every `.scad` in `openscad/` in several option sets and checks tokens/comments preserved, output parses, idempotent. Run it after any printer change.
+- Layout-engine rules learned from fuzzing: a trailing comment is a `LineSuffix{EndsLine: true}` (text that would follow it on the line forces a break first), and an own-line comment starts with `EnsureNewline`, so comments never change attachment between runs.
 - Don't run `pkill -f "go test"` from the shell tool; it matches (and kills) its own command line.
 - Golden tests: `testdata/golden/<name>.in.scad` + `<name>.out.scad`; the runner also asserts idempotency.

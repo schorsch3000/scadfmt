@@ -71,25 +71,25 @@ func TestIfBreakTrailingComma(t *testing.T) {
 }
 
 func TestLineSuffix(t *testing.T) {
-	d := Concat(Text("a;"), LineSuffix{Text(" // c")}, Hardline, Text("b;"))
+	d := Concat(Text("a;"), LineSuffix{D: Text(" // c")}, Hardline, Text("b;"))
 	if got := p(d, 80); got != "a; // c\nb;" {
 		t.Errorf("got %q", got)
 	}
-	d = Concat(Text("a;"), LineSuffix{Text(" // end")})
+	d = Concat(Text("a;"), LineSuffix{D: Text(" // end")})
 	if got := p(d, 80); got != "a; // end" {
 		t.Errorf("at end: %q", got)
 	}
 }
 
 func TestLineSuffixDoesNotCountForFit(t *testing.T) {
-	d := Concat(NewGroup(Text("f("), Softline, Text("a"), Softline, Text(")")), LineSuffix{Text(" // long comment here")})
+	d := Concat(NewGroup(Text("f("), Softline, Text("a"), Softline, Text(")")), LineSuffix{D: Text(" // long comment here")})
 	if got := p(d, 8); got != "f(a) // long comment here" {
 		t.Errorf("got %q", got)
 	}
 }
 
 func TestBreakParent(t *testing.T) {
-	d := NewGroup(Text("("), Nest(Concat(Softline, Text("a"), LineSuffix{Text(" // c")}, BreakParent{})), Softline, Text(")"))
+	d := NewGroup(Text("("), Nest(Concat(Softline, Text("a"), LineSuffix{D: Text(" // c")}, BreakParent{})), Softline, Text(")"))
 	want := "(\n  a // c\n)"
 	if got := p(d, 80); got != want {
 		t.Errorf("got %q want %q", got, want)
@@ -154,5 +154,49 @@ func TestFill(t *testing.T) {
 	}
 	if got := p(d, 10); got != "aaa, bbb,\nccc, ddd,\neee" {
 		t.Errorf("wrapped: %q", got)
+	}
+}
+
+func TestLineSuffixEndsLine(t *testing.T) {
+	// Text that follows a comment on the same line moves to the next line.
+	d := Concat(Text("a"), LineSuffix{D: Text(" // c"), EndsLine: true}, Text("b"))
+	if got := p(d, 80); got != "a // c\nb" {
+		t.Errorf("got %q", got)
+	}
+	// Whitespace alone does not trigger it, and a following break is enough.
+	d = Concat(Text("a"), LineSuffix{D: Text(" // c"), EndsLine: true}, Space, Hardline, Text("b"))
+	if got := p(d, 80); got != "a // c\nb" {
+		t.Errorf("got %q", got)
+	}
+	// The next line keeps the indentation of the text that was pushed down.
+	d = Concat(Text("{"), Nest(Concat(Hardline, Text("a"), LineSuffix{D: Text(" // c"), EndsLine: true}, Text("b"))), Hardline, Text("}"))
+	if got := p(d, 80); got != "{\n  a // c\n  b\n}" {
+		t.Errorf("got %q", got)
+	}
+	// Plain LineSuffix still lets text continue on the line.
+	d = Concat(Text("a"), LineSuffix{D: Text(" // c")}, Text("b"))
+	if got := p(d, 80); got != "ab // c" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestEnsureNewline(t *testing.T) {
+	// Breaks the line when text precedes it...
+	d := Concat(Text("a"), EnsureNewline{}, Text("b"))
+	if got := p(d, 80); got != "a\nb" {
+		t.Errorf("got %q", got)
+	}
+	// ...but not when already at the start of a line, even after indentation.
+	d = Concat(Text("{"), Nest(Concat(Hardline, EnsureNewline{}, Text("a"))), Hardline, Text("}"))
+	if got := p(d, 80); got != "{\n  a\n}" {
+		t.Errorf("got %q", got)
+	}
+	if got := p(Concat(EnsureNewline{}, Text("a")), 80); got != "a" {
+		t.Errorf("at start of output: %q", got)
+	}
+	// It breaks enclosing groups.
+	d = NewGroup(Text("("), Nest(Concat(Softline, Text("a"), EnsureNewline{}, Text("b"))), Softline, Text(")"))
+	if got := p(d, 80); got != "(\n  a\n  b\n)" {
+		t.Errorf("group: %q", got)
 	}
 }

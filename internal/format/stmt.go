@@ -49,7 +49,10 @@ func (p *printer) stmts(ss []syntax.Stmt) doc.Doc {
 func (p *printer) stmt(s syntax.Stmt) doc.Doc {
 	switch n := s.(type) {
 	case *syntax.Empty:
-		return p.tok(n.Semi)
+		p.stmtStart = n.Semi
+		d := p.tok(n.Semi)
+		p.stmtStart = nil
+		return d
 	case *syntax.Block:
 		return p.block(n)
 	case *syntax.Include:

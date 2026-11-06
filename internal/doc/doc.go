@@ -33,8 +33,13 @@ type (
 	IfBreak struct{ Broken, Flat Doc }
 
 	// LineSuffix defers D until just before the next line break (or the end of
-	// output). Used for trailing comments.
-	LineSuffix struct{ D Doc }
+	// output). Used for trailing comments. With EndsLine, D is a comment that
+	// must be the last thing on its line: if more text is about to be printed
+	// on the same line, D is printed first and the line is broken.
+	LineSuffix struct {
+		D        Doc
+		EndsLine bool
+	}
 
 	// BreakParent is empty but forces every enclosing group to break.
 	BreakParent struct{}
@@ -43,6 +48,10 @@ type (
 	// It is for text that must keep its own layout, such as multi-line
 	// comments and strings.
 	LiteralLine struct{}
+
+	// EnsureNewline starts a new line unless output is already at the start of
+	// one. Like a hard line it forces every enclosing group to break.
+	EnsureNewline struct{}
 
 	// Fill lays out Parts, which alternate content, separator, content, ...,
 	// putting as much content on each line as fits. Each separator (normally a
@@ -55,17 +64,18 @@ type (
 	Detach struct{ D Doc }
 )
 
-func (Text) isDoc()        {}
-func (Cat) isDoc()         {}
-func (Line) isDoc()        {}
-func (Indent) isDoc()      {}
-func (*Group) isDoc()      {}
-func (IfBreak) isDoc()     {}
-func (LineSuffix) isDoc()  {}
-func (BreakParent) isDoc() {}
-func (LiteralLine) isDoc() {}
-func (Detach) isDoc()      {}
-func (Fill) isDoc()        {}
+func (Text) isDoc()          {}
+func (Cat) isDoc()           {}
+func (Line) isDoc()          {}
+func (Indent) isDoc()        {}
+func (*Group) isDoc()        {}
+func (IfBreak) isDoc()       {}
+func (LineSuffix) isDoc()    {}
+func (BreakParent) isDoc()   {}
+func (LiteralLine) isDoc()   {}
+func (Detach) isDoc()        {}
+func (Fill) isDoc()          {}
+func (EnsureNewline) isDoc() {}
 
 // Common constructors and singletons.
 var (

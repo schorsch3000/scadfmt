@@ -19,6 +19,10 @@ type printer struct {
 	// (the caller printed them already).
 	skipLeading tok
 
+	// stmtStart is a `;` that is a whole statement. Comments before it are not
+	// set off with a space, as they are before a `;` that ends a statement.
+	stmtStart tok
+
 	// Alignment state, filled in by alignStmts before statements are printed.
 	namePad    map[tok]int // assignment name token -> spaces after the name
 	valuePad   map[tok]int // assignment name token -> spaces before the value
@@ -61,9 +65,10 @@ func (p *printer) tokBreak(t tok) doc.Doc {
 
 type tok = syntax.Tok
 
-// raw prints text that may contain line breaks and must keep its layout.
+// raw prints text that may contain line breaks and must keep its layout. Only
+// "\n" is treated as a line break; a "\r" before it stays in the text, so string
+// literals keep their exact bytes.
 func raw(s string) doc.Doc {
-	s = strings.ReplaceAll(s, "\r\n", "\n")
 	if !strings.Contains(s, "\n") {
 		return doc.Text(s)
 	}
@@ -79,7 +84,7 @@ func raw(s string) doc.Doc {
 
 func commentDoc(c comments.Comment) doc.Doc {
 	if !c.Block {
-		return doc.Text(strings.TrimRight(c.Text, " \t"))
+		return doc.Text(strings.TrimRight(c.Text, " \t\r"))
 	}
 	text := strings.ReplaceAll(c.Text, "\r\n", "\n")
 	lines := strings.Split(text, "\n")
@@ -137,7 +142,7 @@ func (p *printer) leading(t tok) doc.Doc {
 	if len(info.Leading) == 0 || t == p.skipLeading || p.measuring {
 		return doc.Nil
 	}
-	if (t.Kind == lexer.Comma || t.Kind == lexer.Semicolon) && p.inlineLeading(t) {
+	if (t.Kind == lexer.Comma || t.Kind == lexer.Semicolon) && t != p.stmtStart && p.inlineLeading(t) {
 		var parts []doc.Doc
 		for _, c := range info.Leading {
 			parts = append(parts, doc.Space, commentDoc(c))
@@ -145,6 +150,11 @@ func (p *printer) leading(t tok) doc.Doc {
 		return doc.Concat(parts...)
 	}
 	var parts []doc.Doc
+	if info.Leading[0].NewlinesBefore > 0 {
+		// The comment was on its own line. Whatever precedes it in the
+		// layout may not break the line (`!` before a call, say).
+		parts = append(parts, doc.EnsureNewline{})
+	}
 	for i, c := range info.Leading {
 		if i > 0 {
 			if c.NewlinesBefore == 0 {
@@ -189,7 +199,7 @@ func (p *printer) trailingComments(t tok, forceBreak bool) doc.Doc {
 		if i == 0 {
 			pad = strings.Repeat(" ", p.commentPad[t])
 		}
-		parts = append(parts, doc.LineSuffix{D: doc.Concat(doc.Text(pad), doc.Space, commentDoc(c))})
+		parts = append(parts, doc.LineSuffix{D: doc.Concat(doc.Text(pad), doc.Space, commentDoc(c)), EndsLine: true})
 	}
 	switch t.Kind {
 	case lexer.Semicolon, lexer.LBrace, lexer.RBrace:

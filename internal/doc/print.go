@@ -18,6 +18,12 @@ type cmd struct {
 	doc    Doc
 }
 
+// pending is a deferred LineSuffix.
+type pending struct {
+	cmd
+	ends bool // its text must end the line
+}
+
 // Print lays out d and returns the text. Trailing spaces and tabs are removed
 // from every line.
 func Print(d Doc, opts Options) string {
@@ -27,14 +33,17 @@ func Print(d Doc, opts Options) string {
 	propagateBreaks(d)
 
 	var out []byte
-	var suffix []cmd // pending LineSuffix docs
+	var suffix []pending // deferred LineSuffix docs
 	col := 0
 	stack := []cmd{{0, modeBreak, d}}
 
-	newline := func(indent int) {
+	trim := func() {
 		for len(out) > 0 && (out[len(out)-1] == ' ' || out[len(out)-1] == '\t') {
 			out = out[:len(out)-1]
 		}
+	}
+	newline := func(indent int) {
+		trim()
 		out = append(out, '\n')
 		if opts.UseTabs {
 			out = append(out, strings.Repeat("\t", indent)...)
@@ -49,6 +58,17 @@ func Print(d Doc, opts Options) string {
 		stack = stack[:len(stack)-1]
 		switch x := c.doc.(type) {
 		case Text:
+			if endsLinePending(suffix) && strings.TrimSpace(string(x)) != "" {
+				// A comment must end its line, but text follows: print the
+				// comment, break the line, and then come back to this text.
+				trim()
+				stack = append(stack, c, cmd{c.indent, modeBreak, Line{Hard: true}})
+				for i := len(suffix) - 1; i >= 0; i-- {
+					stack = append(stack, suffix[i].cmd)
+				}
+				suffix = nil
+				continue
+			}
 			out = append(out, string(x)...)
 			col += utf8.RuneCountInString(string(x))
 		case Cat:
@@ -73,17 +93,22 @@ func Print(d Doc, opts Options) string {
 				stack = append(stack, cmd{c.indent, c.mode, x.Flat})
 			}
 		case LineSuffix:
-			suffix = append(suffix, cmd{c.indent, c.mode, x.D})
+			suffix = append(suffix, pending{cmd{c.indent, c.mode, x.D}, x.EndsLine})
 		case BreakParent:
+		case EnsureNewline:
+			if !atLineStart(out) {
+				stack = append(stack, cmd{c.indent, modeBreak, Line{Hard: true}})
+			}
 		case Detach:
 			stack = append(stack, cmd{c.indent, modeBreak, x.D})
 		case Fill:
 			stack = fillStep(x, c, stack, opts.MaxWidth-col, opts)
 		case LiteralLine:
 			if len(suffix) > 0 {
+				trim()
 				stack = append(stack, c)
 				for i := len(suffix) - 1; i >= 0; i-- {
-					stack = append(stack, suffix[i])
+					stack = append(stack, suffix[i].cmd)
 				}
 				suffix = nil
 				continue
@@ -100,9 +125,10 @@ func Print(d Doc, opts Options) string {
 			}
 			if len(suffix) > 0 {
 				// Run the deferred docs first, then redo this line break.
+				trim()
 				stack = append(stack, c)
 				for i := len(suffix) - 1; i >= 0; i-- {
-					stack = append(stack, suffix[i])
+					stack = append(stack, suffix[i].cmd)
 				}
 				suffix = nil
 				continue
@@ -111,12 +137,36 @@ func Print(d Doc, opts Options) string {
 		}
 		if len(stack) == 0 && len(suffix) > 0 {
 			for i := len(suffix) - 1; i >= 0; i-- {
-				stack = append(stack, suffix[i])
+				stack = append(stack, suffix[i].cmd)
 			}
 			suffix = nil
 		}
 	}
 	return strings.TrimRight(string(out), " \t")
+}
+
+// atLineStart reports whether out is empty or ends in a line break followed
+// only by indentation.
+func atLineStart(out []byte) bool {
+	for i := len(out) - 1; i >= 0; i-- {
+		switch out[i] {
+		case ' ', '\t':
+		case '\n':
+			return true
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func endsLinePending(suffix []pending) bool {
+	for _, c := range suffix {
+		if c.ends {
+			return true
+		}
+	}
+	return false
 }
 
 // fillStep schedules the first content item of a Fill and the separator after
@@ -197,7 +247,7 @@ func fits(next cmd, rest []cmd, width int, opts Options) bool {
 			for i := len(x.Parts) - 1; i >= 0; i-- {
 				stack = append(stack, cmd{c.indent, c.mode, x.Parts[i]})
 			}
-		case LiteralLine:
+		case LiteralLine, EnsureNewline:
 			return true
 		case Line:
 			if c.mode == modeBreak || x.Hard {
@@ -246,7 +296,7 @@ func propagateBreaks(d Doc) bool {
 		return propagateBreaks(x.Flat)
 	case Line:
 		return x.Hard
-	case BreakParent, LiteralLine:
+	case BreakParent, LiteralLine, EnsureNewline:
 		return true
 	case Detach:
 		propagateBreaks(x.D)
