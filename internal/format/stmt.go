@@ -32,6 +32,7 @@ func (p *printer) file(f *syntax.File) doc.Doc {
 // stmts prints statements one per line, keeping at most one blank line
 // between them.
 func (p *printer) stmts(ss []syntax.Stmt) doc.Doc {
+	p.alignStmts(ss)
 	var parts []doc.Doc
 	for i, s := range ss {
 		if i > 0 {
@@ -54,7 +55,7 @@ func (p *printer) stmt(s syntax.Stmt) doc.Doc {
 	case *syntax.Include:
 		return p.include(n)
 	case *syntax.Assignment:
-		return doc.Concat(p.tok(n.Name), doc.Space, p.tok(n.Eq), p.rhs(n.Value), p.tok(n.Semi))
+		return p.assignment(n)
 	case *syntax.ModuleDef:
 		return doc.Concat(
 			p.tok(n.Module), doc.Space, p.tok(n.Name),
@@ -89,7 +90,9 @@ func (p *printer) block(b *syntax.Block) doc.Doc {
 	if len(b.Stmts) == 0 && len(closeInfo.Leading) == 0 && len(p.info[b.LBrace].Trailing) == 0 {
 		return doc.Concat(p.tok(b.LBrace), p.bare(b.RBrace))
 	}
+	p.depth++
 	inner := []doc.Doc{doc.Hardline, p.stmts(b.Stmts)}
+	p.depth--
 	if len(b.Stmts) == 0 {
 		inner = nil
 	}

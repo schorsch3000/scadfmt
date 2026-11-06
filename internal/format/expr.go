@@ -1,6 +1,8 @@
 package format
 
 import (
+	"strings"
+
 	"scadfmt/internal/doc"
 	"scadfmt/internal/lexer"
 	"scadfmt/internal/syntax"
@@ -63,8 +65,9 @@ func isNil(d doc.Doc) bool {
 // args prints a parameter or argument list including its parentheses.
 func (p *printer) args(lp tok, l syntax.List, rp tok, hug bool) doc.Doc {
 	items := make([]doc.Doc, len(l.Items))
+	pads := p.paramPads(l)
 	for i, a := range l.Items {
-		items[i] = p.arg(a)
+		items[i] = p.arg(a, pads[i])
 	}
 	hugOK := hug && len(l.Items) == 1 && l.Items[0].Name == nil && isVector(l.Items[0].Value)
 	// An argument list that starts on a new line in the source stays broken.
@@ -77,10 +80,16 @@ func isVector(e syntax.Expr) bool {
 	return ok
 }
 
-func (p *printer) arg(a *syntax.Arg) doc.Doc {
+// arg prints one argument or parameter. pad is the number of spaces that line
+// up its `=` with its neighbours when the list is broken one item per line.
+func (p *printer) arg(a *syntax.Arg, pad int) doc.Doc {
 	switch {
 	case a.Name != nil && a.Value != nil:
-		return doc.Concat(p.tok(a.Name), doc.Space, p.tok(a.Eq), doc.Space, p.expr(a.Value))
+		var align doc.Doc = doc.Nil
+		if pad > 0 {
+			align = doc.IfBreak{Broken: doc.Text(strings.Repeat(" ", pad))}
+		}
+		return doc.Concat(p.tok(a.Name), align, doc.Space, p.tok(a.Eq), doc.Space, p.expr(a.Value))
 	case a.Name != nil:
 		return p.tok(a.Name)
 	}
@@ -267,7 +276,7 @@ func (p *printer) lcFor(n *syntax.LcFor) doc.Doc {
 func (p *printer) flatList(l syntax.List) doc.Doc {
 	var parts []doc.Doc
 	for i, a := range l.Items {
-		parts = append(parts, p.arg(a))
+		parts = append(parts, p.arg(a, 0))
 		if i < len(l.Commas) {
 			parts = append(parts, p.tok(l.Commas[i]))
 			if i < len(l.Items)-1 {
@@ -310,9 +319,25 @@ func multiline(n *syntax.Vector) bool {
 }
 
 func (p *printer) vector(n *syntax.Vector) doc.Doc {
-	if p.opts.Matrix != MatrixReflow && multiline(n) {
+	wrap := p.opts.Matrix != MatrixReflow && multiline(n)
+	if p.opts.Matrix == MatrixAlign {
+		if table, ok := p.vectorTable(n); ok {
+			if wrap {
+				return table
+			}
+			// Written on one line: stay on one line if it fits, otherwise
+			// become a table, as it would on the next run.
+			return doc.NewGroup(doc.IfBreak{Broken: table, Flat: p.flatVector(n)})
+		}
+	}
+	if wrap {
 		return p.vectorRows(n)
 	}
+	return p.flatVector(n)
+}
+
+// flatVector prints a vector as one line if it fits, else one element per line.
+func (p *printer) flatVector(n *syntax.Vector) doc.Doc {
 	items := make([]doc.Doc, len(n.Elems))
 	for i, x := range n.Elems {
 		items[i] = p.expr(x)

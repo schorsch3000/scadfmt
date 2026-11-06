@@ -32,7 +32,7 @@ Inspect AST of a file with a built OpenSCAD binary: `openscad -o - --export-form
 
 - Language: Go. Single static binary, no cgo (so no tree-sitter).
 - Own lossless lexer + recursive-descent parser producing a CST. Grammar taken from `openscad/src/core/parser.y`. Lexer emits trivia (comments, newlines, blank lines); comments attach to nodes as leading/trailing/dangling. Must keep `#` `%` `!` `*` modifiers, parens, and raw `include <...>`/`use <...>`.
-- Output via Wadler-style doc IR (text, line, softline, indent, group), written in-house. Alignment uses a `Table` node (rows of cells, per-column max width, pad with spaces only). Alignment must never influence the preserve-layout decision, or idempotency breaks.
+- Output via Wadler-style doc IR (`internal/doc`: text, line, group, indent, if-break, line-suffix, fill, detach), written in-house. Alignment has no `Table` doc node: `internal/format/align.go` measures each row printed flat and bakes the padding into the docs, only for rows that really print on one line (it checks the width at the current indentation). Padding must never influence what a later run decides (layout reads source line breaks and tokens, never spaces), or idempotency breaks.
 - Style: prettier-like, configurable. Config file `.scadfmt.yaml` (YAML, snake_case keys), CLI flags override:
 
 ```yaml
@@ -62,7 +62,7 @@ numbers:
 
 ## Milestones
 
-Tracked in git-bug (`git bug bug`, close with `git bug bug status close <id>`).
+Tracked in git-bug (`git bug bug`, close with `git bug bug status close <id>`). M0-M7 are done; M8 (YAML config, CLI flags, `--preset pretty`) and M9 (AST-equivalence check against `openscad`) remain.
 
 ## Commands
 
@@ -72,4 +72,7 @@ Go lives in `/usr/local/go/bin`, not on PATH by default: `export PATH=$PATH:/usr
 - Test all: `go test ./...`
 - Single test: `go test ./internal/format -run TestGolden/simple`
 - Run: `scadfmt [-w] [-check] [files...]` (stdin when no files)
+- Package layout: `internal/lexer` (tokens + trivia) -> `internal/syntax` (CST) -> `internal/comments` (comment placement) -> `internal/format` (CST to docs) -> `internal/doc` (layout).
+- Corpus property test (`internal/format/corpus_test.go`): formats every `.scad` in `openscad/` in several option sets and checks tokens/comments preserved, output parses, idempotent. Run it after any printer change.
+- Don't run `pkill -f "go test"` from the shell tool; it matches (and kills) its own command line.
 - Golden tests: `testdata/golden/<name>.in.scad` + `<name>.out.scad`; the runner also asserts idempotency.

@@ -18,10 +18,20 @@ type printer struct {
 	// skipLeading, when set, is a token whose leading comments are not printed
 	// (the caller printed them already).
 	skipLeading tok
+
+	// Alignment state, filled in by alignStmts before statements are printed.
+	namePad    map[tok]int // assignment name token -> spaces after the name
+	valuePad   map[tok]int // assignment name token -> spaces before the value
+	commentPad map[tok]int // last token of a statement -> extra spaces before its trailing comment
+	measuring  bool        // build docs without comments, to measure widths
+	depth      int         // block nesting depth, to know the indentation when measuring
 }
 
 func newPrinter(toks []lexer.Token, opts Options) *printer {
-	p := &printer{toks: toks, index: make(map[tok]int, len(toks)), info: comments.Attach(toks), opts: opts}
+	p := &printer{
+		toks: toks, index: make(map[tok]int, len(toks)), info: comments.Attach(toks), opts: opts,
+		namePad: map[tok]int{}, valuePad: map[tok]int{}, commentPad: map[tok]int{},
+	}
 	for i := range toks {
 		p.index[&toks[i]] = i
 	}
@@ -124,7 +134,7 @@ func (p *printer) hasLeading(t tok) bool { return len(p.info[t].Leading) > 0 }
 // leading prints the comments before t.
 func (p *printer) leading(t tok) doc.Doc {
 	info := p.info[t]
-	if len(info.Leading) == 0 || t == p.skipLeading {
+	if len(info.Leading) == 0 || t == p.skipLeading || p.measuring {
 		return doc.Nil
 	}
 	if (t.Kind == lexer.Comma || t.Kind == lexer.Semicolon) && p.inlineLeading(t) {
@@ -170,12 +180,16 @@ func (p *printer) tokNoBreak(t tok) doc.Doc {
 
 func (p *printer) trailingComments(t tok, forceBreak bool) doc.Doc {
 	cs := p.info[t].Trailing
-	if len(cs) == 0 {
+	if len(cs) == 0 || p.measuring {
 		return doc.Nil
 	}
 	var parts []doc.Doc
-	for _, c := range cs {
-		parts = append(parts, doc.LineSuffix{D: doc.Concat(doc.Space, commentDoc(c))})
+	for i, c := range cs {
+		pad := ""
+		if i == 0 {
+			pad = strings.Repeat(" ", p.commentPad[t])
+		}
+		parts = append(parts, doc.LineSuffix{D: doc.Concat(doc.Text(pad), doc.Space, commentDoc(c))})
 	}
 	switch t.Kind {
 	case lexer.Semicolon, lexer.LBrace, lexer.RBrace:
@@ -191,6 +205,9 @@ func (p *printer) text(t tok) doc.Doc {
 	switch t.Kind {
 	case lexer.String, lexer.Include, lexer.Use:
 		return raw(t.Text)
+	}
+	if t.Kind == lexer.Number && p.opts.NormalizeNumbers {
+		return doc.Text(normalizeNumber(t.Text))
 	}
 	return doc.Text(t.Text)
 }

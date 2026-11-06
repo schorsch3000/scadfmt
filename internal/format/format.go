@@ -28,11 +28,23 @@ type Options struct {
 	UseTabs  bool
 	Chain    string // ChainAuto, ChainFlat or ChainBreak
 	Matrix   string // MatrixPreserve, MatrixReflow or MatrixAlign
+
+	// Alignment. All off by default. Each pads with spaces only and never
+	// changes the text of a token. AlignDecimal needs AlignAssignments.
+	AlignAssignments      bool // align `=` in consecutive assignments
+	AlignDecimal          bool // align numeric values on the decimal point
+	AlignParams           bool // align `=` in broken parameter/argument lists
+	AlignTrailingComments bool // align `//` comments after consecutive statements
+	AlignMaxGap           int  // split an alignment group when widths differ by more than this; <= 0 means no limit
+
+	// NormalizeNumbers rewrites number literals: `.5` becomes `0.5`, `1.50`
+	// becomes `1.5` and `1.` becomes `1.0`. Hex and exponent parts are kept.
+	NormalizeNumbers bool
 }
 
 // DefaultOptions returns the default formatting options.
 func DefaultOptions() Options {
-	return Options{MaxWidth: 100, Indent: 2, Chain: ChainAuto, Matrix: MatrixPreserve}
+	return Options{MaxWidth: 100, Indent: 2, Chain: ChainAuto, Matrix: MatrixPreserve, AlignMaxGap: 8}
 }
 
 // Format formats src. It fails if src does not lex and parse.
