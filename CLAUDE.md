@@ -62,4 +62,14 @@ numbers:
 
 ## Milestones
 
-Tracked in git-bug (`git bug bug`). Build/test commands: add here once the Go module exists.
+Tracked in git-bug (`git bug bug`, close with `git bug bug status close <id>`).
+
+## Commands
+
+Go lives in `/usr/local/go/bin`, not on PATH by default: `export PATH=$PATH:/usr/local/go/bin`.
+
+- Build: `go build -o scadfmt ./cmd/scadfmt`
+- Test all: `go test ./...`
+- Single test: `go test ./internal/format -run TestGolden/simple`
+- Run: `scadfmt [-w] [-check] [files...]` (stdin when no files)
+- Golden tests: `testdata/golden/<name>.in.scad` + `<name>.out.scad`; the runner also asserts idempotency.
