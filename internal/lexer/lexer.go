@@ -96,6 +96,8 @@ func (l *lexer) next() {
 		l.addTrivia(Newline, 2)
 	case c == ' ' || c == '\t' || c == '\r':
 		l.addTrivia(Whitespace, 1)
+	case c == 0xa0: // lone Latin-1 NBSP, accepted by lexer.l
+		l.addTrivia(Whitespace, 1)
 	case strings.HasPrefix(r, nbsp):
 		l.addTrivia(Whitespace, len(nbsp))
 	case strings.HasPrefix(r, bom):
